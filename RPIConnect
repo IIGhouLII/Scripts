@@ -1,0 +1,70 @@
+#!/bin/bash
+nbr_arg=$#
+first_arg=$1
+second_arg=$2
+Error_CNF="Command not found"
+Error_NTD="Nothing to do"
+
+MOCP="0"
+PULSEAUDIO="0"
+BUZZ="0"
+STREAM="0"
+
+if ps -u raspberry -o pid,comm | grep -e mocp > /dev/null; then             MOCP="1";       fi;
+if ps -u raspberry -o pid,comm | grep -e pulseaudio > /dev/null; then       PULSEAUDIO="1"; fi;
+if ps -u raspberry -o pid,comm | grep -e Buzz > /dev/null; then             BUZZ="1";       fi;
+if ps -u raspberry -o pid,comm | grep -e mjpg_streamer > /dev/null; then    STREAM="1";     fi;
+
+
+if [[ $nbr_arg = 1 ]]; then
+    if [[ $first_arg = "-status" ]]; then
+        echo $MOCP$PULSEAUDIO$BUZZ$STREAM$EOF
+    else
+        echo $Error_CNF
+    fi
+elif [[ $nbr_arg = 2 ]]; then
+    if [[ $first_arg = "-vol" ]]; then
+        if [[ $second_arg = "+" ]]; then /bin/sh -c "amixer -c 0 set PCM  5dB+ > /dev/null";
+        elif [[ $second_arg = "-" ]]; then /bin/sh -c "amixer -c 0 set PCM  5dB- > /dev/null";
+        else  echo $Error_CNF;
+        fi
+    elif [[ $first_arg = "-mocp" ]]; then
+        if [[ $MOCP = "1" ]]; then
+            if [[ $second_arg = "off" ]]; then /bin/sh -c "mocp -x";
+            elif [[ $second_arg = "on" ]]; then echo $Error_NTD;
+            elif [[ $second_arg = "next" ]]; then /bin/sh -c "mocp -f";
+            elif [[ $second_arg = "prev" ]]; then /bin/sh -c "mocp -r";
+            elif [[ $second_arg = "play_pause" ]]; then /bin/sh -c "mocp -G";
+            else echo $Error_CNF;
+            fi
+        else
+            if [[ $second_arg = "on" || $second_arg = "play_pause" ]]; then /bin/sh -c "mocp -S >/dev/null && mocp -p";
+            elif [[ $second_arg = "off" ]]; then echo $Error_NTD;
+            else echo $Error_CNF;
+            fi
+        fi
+    elif [[ $first_arg = "-pulseaudio" ]]; then
+        if   [[ $second_arg = "on" && $PULSEAUDIO = "0" ]]; then /bin/sh -c "pulseaudio -D";
+        elif [[ $second_arg = "off" && $PULSEAUDIO = "1" ]]; then /bin/sh -c "killall pulseaudio";
+        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
+        else echo $Error_CNF;
+        fi
+    elif [[ $first_arg = "-stream" ]]; then
+        if   [[ $second_arg = "on" && $STREAM = "0" ]]; then /bin/sh -c "mjpg_streamer -b -i \"input_uvc.so\" -o \"output_http.so -p 8090\" > /dev/null";
+        elif [[ $second_arg = "off" && $STREAM = "1" ]]; then /bin/sh -c "killall mjpg_streamer > /dev/null";
+        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
+        else echo $Error_CNF;
+        fi
+    
+    elif [[ $first_arg = "-buzz" ]]; then
+        if   [[ $second_arg = "on" && $BUZZ = "0" ]]; then /bin/sh -c "Buzz > /dev/null";
+        elif [[ $second_arg = "off" && $BUZZ = "1" ]]; then /bin/sh -c "killall Buzz > /dev/null";
+        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
+        else echo $Error_CNF;
+        fi
+    else
+        echo $Error_CNF;
+    fi
+else
+    echo $Error_CNF;
+fi

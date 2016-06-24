@@ -1,0 +1,82 @@
+#!/bin/sh
+
+DEVICE="xx:xx:xx:xx"
+CHECK_INTERVAL=5
+HCITOOL="/usr/bin/hcitool"
+DEBUG="/home/raspberry/.log/btproximity.log"
+
+
+function msg {
+    echo "$1" >> $DEBUG
+}
+
+function msgn {
+    echo -n "$1" >> $DEBUG
+}
+
+function check_connection {
+    connected=0;
+    found=0
+    for s in `$HCITOOL con`; do
+        if [[ "$s" == "$DEVICE" ]]; then
+            found=1;
+        fi
+    done
+    if [[ $found == 1 ]]; then
+        connected=1;
+    else
+       msgn 'Attempting connection...'
+        if [ -z "`sudo $HCITOOL cc $DEVICE 2>&1`" ]; then
+            msg 'Connected.'
+            connected=1;
+        else
+            msg "ERROR: Could not connect to device $DEVICE."
+        fi
+    fi
+}
+
+function start_mocp {
+    if ! ps aux | grep -w "mocp" | grep -v grep > /dev/null ; then
+	mocp -S
+	mocp -o shuffle
+	mocp -p
+    else
+	mocp -G
+    fi
+}
+
+check_connection
+
+while [[ $connected -eq 0 ]]; do
+    check_connection
+    sleep 1
+done
+
+name=`$HCITOOL name $DEVICE`
+msg "Monitoring proximity of \"$name\" [$DEVICE]";
+
+state="NotDetectable"
+while /bin/true; do
+    check_connection
+
+    if [[ $connected -eq 1 ]]; then
+	if [[ "$state" == "NotDetectable" ]]; then
+                rssi=`$HCITOOL rssi $DEVICE | sed -e 's/RSSI return value: //g'`
+        	msg "*** Device \"$name\" [$DEVICE] is now detectable (signal: $rssi)"
+	        state="Detectable"
+        	start_mocp > /dev/null 2>&1
+        	CHECK_INTERVAL=5
+        fi
+        
+
+    elif [[ "$state" == "Detectable" ]]; then
+            msg "*** Device \"$name\" [$DEVICE] is no longer detectable"
+            state="NotDetectable"
+            start_mocp > /dev/null 2>&1
+            CHECK_INTERVAL=2
+    fi
+
+    msg "state = $state, PID = $PID, sleep = $CHECK_INTERVAL"
+
+    sleep $CHECK_INTERVAL
+done
