@@ -1,0 +1,24 @@
+#EXTM3U
+#MOCSERIAL: 6144
+#EXTINF:0,Cherie Acoustic
+http://adwzg3.tdf-cdn.com/8644/nrj_172974.mp3
+#EXTINF:0,NRJ Acoustic
+http://adwzg3.tdf-cdn.com/8663/nrj_171479.mp3
+#EXTINF:0,Classic Blues Vintage Station
+http://streaming.radionomy.com/A-Better-Classic-Blues-Vintage-Station?lang=en-US%2cen%3bq%3d0.5
+#EXTINF:0,The Acoustic Outpost
+http://stream.opost.com/outpost
+#EXTINF:0,Mosaique FM
+http://radio.mosaiquefm.net:8000/mosalive
+#EXTINF:0,World's Greatest Melodies
+http://streaming208.radionomy.com/ACLASSICFM-WEB?group=0&countrycode=SA&similarprocess=2&crashed=0
+#EXTINF:0,Calm Radio-Piano and Guitar
+http://calm1.calmradio.com:8206/;stream.nsv
+#EXTINF:0,Hits on Guitar
+http://streaming.radionomy.com/hits-on-guitar
+#EXTINF:0,Acoustic Guitar
+http://streaming.radionomy.com/Acoustic-Guitar
+#EXTINF:0,ClassicalHits
+http://streaming.radionomy.com/1000ClassicalHits
+#EXTINF:0,Aardvark Blues FM
+http://74.208.45.146:8639/stream/;
