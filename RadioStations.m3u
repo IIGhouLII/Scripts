@@ -22,3 +22,5 @@ http://streaming.radionomy.com/Acoustic-Guitar
 http://streaming.radionomy.com/1000ClassicalHits
 #EXTINF:0,Aardvark Blues FM
 http://74.208.45.146:8639/stream/;
+#EXTINF:0,Caprice Acoustic Blues
+http://79.111.14.76:9071/;
