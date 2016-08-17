@@ -62,6 +62,13 @@ elif [[ $nbr_arg = 2 ]]; then
         elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
         else echo $Error_CNF;
         fi
+    
+    elif [[ $first_arg = "-talk" ]]; then
+        if   [[ $second_arg = "ip" ]]; then echo "my i p address, is,  `ifconfig eth0 |grep inet |grep netmask |cut -c14-26`"| festival --tts;
+        elif [[ $second_arg = "time" ]]; then echo "now is `date "+%I:%M"`"| festival --tts;
+        else echo $Error_CNF;
+        fi
+    
     else
         echo $Error_CNF;
     fi
