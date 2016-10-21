@@ -4,74 +4,143 @@ first_arg=$1
 second_arg=$2
 Error_CNF="Command not found"
 Error_NTD="Nothing to do"
+PathRadioStations="/home/raspberry/UsefulFiles/RadioStations.m3u"
 
 MOCP="0"
 PULSEAUDIO="0"
 BUZZ="0"
 STREAM="0"
 
-if ps -u raspberry -o pid,comm | grep -e mocp > /dev/null; then             MOCP="1";       fi;
-if ps -u raspberry -o pid,comm | grep -e pulseaudio > /dev/null; then       PULSEAUDIO="1"; fi;
-if ps -u raspberry -o pid,comm | grep -e Buzz > /dev/null; then             BUZZ="1";       fi;
-if ps -u raspberry -o pid,comm | grep -e mjpg_streamer > /dev/null; then    STREAM="1";     fi;
+if ps -u raspberry -o pid,comm | grep -e mocp > /dev/null; then           MOCP="1";       fi;
+if ps -u raspberry -o pid,comm | grep -e pulseaudio > /dev/null; then     PULSEAUDIO="1"; fi;
+if ps -u raspberry -o pid,comm | grep -e Buzz > /dev/null; then           BUZZ="1";       fi;
+if ps -u raspberry -o pid,comm | grep -e mjpg_streamer > /dev/null; then  STREAM="1";     fi;
 
+CheckStateMOCP () {
+  eval  "$1=$(mocp -Q %state 2> /dev/null)"
+}
 
-if [[ $nbr_arg = 1 ]]; then
+FindNameRadioStation() {
+  local Link=$(mocp -Q %file 2> /dev/null);
+  if [[ $Link ]] ; then
+    local IndexOfLink=$(grep -n "$Link" "$PathRadioStations" | cut -d':' -f1);
+    local IndexOfName=$(( IndexOfLink - 1 ));
+    eval  "$1='$(sed "${IndexOfName}q;d" "$PathRadioStations" | cut -d',' -f2)'";
+  fi;
+}
+
+FindIPAddress(){
+  eval  "$1=$(ifconfig eth0 | grep -w inet | tr -s ' ' | cut -d ' ' -f 3)"
+}
+
+if [[ $nbr_arg -eq 1 ]]; then
     if [[ $first_arg = "-status" ]]; then
-        echo $MOCP$PULSEAUDIO$BUZZ$STREAM$EOF
+        echo "$MOCP$PULSEAUDIO$BUZZ$STREAM$EOF"
     else
-        echo $Error_CNF
+        echo "$Error_CNF"
     fi
-elif [[ $nbr_arg = 2 ]]; then
+elif [[ $nbr_arg -eq 2 ]]; then
     if [[ $first_arg = "-vol" ]]; then
-        if [[ $second_arg = "+" ]]; then /bin/sh -c "amixer -c 0 set PCM  5dB+ > /dev/null";
-        elif [[ $second_arg = "-" ]]; then /bin/sh -c "amixer -c 0 set PCM  5dB- > /dev/null";
-        else  echo $Error_CNF;
+        if [[ $second_arg = "+" ]]; then
+            amixer -c 0 set PCM  5dB+ > /dev/null;
+        elif [[ $second_arg = "-" ]]; then
+            amixer -c 0 set PCM  5dB- > /dev/null;
+        else
+            echo "$Error_CNF";
         fi
     elif [[ $first_arg = "-mocp" ]]; then
         if [[ $MOCP = "1" ]]; then
-            if [[ $second_arg = "off" ]]; then /bin/sh -c "mocp -x";
-            elif [[ $second_arg = "on" ]]; then echo $Error_NTD;
-            elif [[ $second_arg = "next" ]]; then /bin/sh -c "mocp -f";
-            elif [[ $second_arg = "prev" ]]; then /bin/sh -c "mocp -r";
-            elif [[ $second_arg = "play_pause" ]]; then /bin/sh -c "mocp -G";
-            else echo $Error_CNF;
+            if [[ $second_arg = "off" ]]; then
+                mocp -x 2> /dev/null;
+            elif [[ $second_arg = "on" ]]; then
+                echo "$Error_NTD";
+            elif [[ $second_arg = "next" ]]; then
+                mocp -f 2> /dev/null;
+                FindNameRadioStation NameRadioStation;
+                if [[ $NameRadioStation ]]; then
+                    CheckStateMOCP mocp_state;
+                    if [[ $mocp_state = "PLAY" ]]; then
+                      mocp -P 2> /dev/null;
+                      echo $NameRadioStation | festival --tts;
+                      mocp -U 2> /dev/null;
+                    fi;
+                fi;
+            elif [[ $second_arg = "prev" ]]; then
+                mocp -r 2> /dev/null;
+                FindNameRadioStation NameRadioStation;
+                if [[ $NameRadioStation ]]; then
+                    CheckStateMOCP mocp_state;
+                    if [[ $mocp_state = "PLAY" ]]; then
+                      mocp -P 2> /dev/null;
+                      echo $NameRadioStation | festival --tts;
+                      mocp -U 2> /dev/null;
+                    fi;
+                fi;
+            elif [[ $second_arg = "play_pause" ]]; then
+                CheckStateMOCP mocp_state;
+                if [[ $mocp_state = "PAUSE" ]]; then
+                    FindNameRadioStation NameRadioStation;
+                    if [[ $NameRadioStation ]]; then
+                      echo $NameRadioStation | festival --tts;
+                    fi;
+                fi
+                mocp -G 2> /dev/null;
+            else
+                echo "$Error_CNF";
             fi
-        else
-            if [[ $second_arg = "on" || $second_arg = "play_pause" ]]; then /bin/sh -c "mocp -S >/dev/null && mocp -p";
-            elif [[ $second_arg = "off" ]]; then echo $Error_NTD;
-            else echo $Error_CNF;
+        elif [[ $MOCP = "0" ]]; then
+            if [[ $second_arg = "on" || $second_arg = "play_pause" ]]; then
+                mocp -S >/dev/null 2>/dev/null && mocp -p 2> /dev/null;
+            elif [[ $second_arg = "off" ]]; then
+                echo "$Error_NTD";
+            else
+                echo "$Error_CNF";
             fi
         fi
     elif [[ $first_arg = "-pulseaudio" ]]; then
-        if   [[ $second_arg = "on" && $PULSEAUDIO = "0" ]]; then /bin/sh -c "pulseaudio -D";
-        elif [[ $second_arg = "off" && $PULSEAUDIO = "1" ]]; then /bin/sh -c "killall pulseaudio";
-        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
-        else echo $Error_CNF;
+        if   [[ $second_arg = "on" && $PULSEAUDIO = "0" ]]; then
+            pulseaudio -D  > /dev/null;
+        elif [[ $second_arg = "off" && $PULSEAUDIO = "1" ]]; then
+            killall pulseaudio  > /dev/null;
+        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then
+            echo "$Error_NTD";
+        else
+            echo "$Error_CNF";
         fi
     elif [[ $first_arg = "-stream" ]]; then
-        if   [[ $second_arg = "on" && $STREAM = "0" ]]; then /bin/sh -c "mjpg_streamer -b -i \"input_uvc.so\" -o \"output_http.so -p 8090\" > /dev/null";
-        elif [[ $second_arg = "off" && $STREAM = "1" ]]; then /bin/sh -c "killall mjpg_streamer > /dev/null";
-        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
-        else echo $Error_CNF;
+        if   [[ $second_arg = "on" && $STREAM = "0" ]]; then
+            mjpg_streamer -b -i "input_uvc.so" -o "output_http.so -p 8090" > /dev/null;
+        elif [[ $second_arg = "off" && $STREAM = "1" ]]; then
+            killall mjpg_streamer > /dev/null;
+        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then
+            echo "$Error_NTD";
+        else
+            echo "$Error_CNF";
         fi
-    
+
     elif [[ $first_arg = "-buzz" ]]; then
-        if   [[ $second_arg = "on" && $BUZZ = "0" ]]; then /bin/sh -c "Buzz > /dev/null";
-        elif [[ $second_arg = "off" && $BUZZ = "1" ]]; then /bin/sh -c "killall Buzz > /dev/null";
-        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then echo $Error_NTD;
-        else echo $Error_CNF;
+        if   [[ $second_arg = "on" && $BUZZ = "0" ]]; then
+            Buzz > /dev/null;
+        elif [[ $second_arg = "off" && $BUZZ = "1" ]]; then
+            killall Buzz > /dev/null;
+        elif [[ $second_arg = "on" || $second_arg = "off" ]]; then
+            echo "$Error_NTD";
+        else
+            echo "$Error_CNF";
         fi
-    
+
     elif [[ $first_arg = "-talk" ]]; then
-        if   [[ $second_arg = "ip" ]]; then echo "my i p address, is,  `ifconfig eth0 |grep inet |grep netmask |cut -c14-26`"| festival --tts;
-        elif [[ $second_arg = "time" ]]; then echo "now is `date "+%I:%M"`"| festival --tts;
-        else echo $Error_CNF;
+        if   [[ $second_arg = "ip" ]]; then
+            FindIPAddress IPaddr;
+            echo "my i p address, is,  $IPaddr"| festival --tts;
+        elif [[ $second_arg = "time" ]]; then
+            echo "now is `date "+%I:%M"`"| festival --tts;
+        else
+            echo "$Error_CNF";
         fi
-    
     else
-        echo $Error_CNF;
+        echo "$Error_CNF";
     fi
 else
-    echo $Error_CNF;
+    echo "$Error_CNF";
 fi
