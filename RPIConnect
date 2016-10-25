@@ -45,7 +45,7 @@ elif [[ $nbr_arg -eq 2 ]]; then
     elif [[ $first_arg = "-mp" ]]; then
         if [[ $MP = "1" ]]; then
             if [[ $second_arg = "off" ]]; then
-                killall cmus > /dev/null;
+                cmus-remote -C "quit";
             elif [[ $second_arg = "on" ]]; then
                 echo "$Error_NTD";
             elif [[ $second_arg = "+" ]]; then
@@ -91,9 +91,14 @@ elif [[ $nbr_arg -eq 2 ]]; then
                 echo "$Error_CNF";
             fi
         elif [[ $MP = "0" ]]; then
-            if [[ $second_arg = "on" || $second_arg = "play_pause" ]]; then
-                cmusd & sleep 1 & cmus-remote -p && tmux detach-client -s cmusq;
-                # mocp -S >/dev/null 2>/dev/null && mocp -p 2> /dev/null;
+            if [[ $second_arg = "on" ]]; then
+                cmusd & sleep 5 && tmux detach-client -s cmus;
+            elif [[ $second_arg = "play_pause" ]]; then
+                cmusd & sleep 5 && tmux detach-client -s cmus && cmus-remote -p;
+                FindNameRadioStation NameRadioStation;
+                if [[ $NameRadioStation ]]; then
+                    echo $NameRadioStation | festival --tts;
+                fi;
             elif [[ $second_arg = "off" ]]; then
                 echo "$Error_NTD";
             else
