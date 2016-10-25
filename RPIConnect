@@ -4,29 +4,23 @@ first_arg=$1
 second_arg=$2
 Error_CNF="Command not found"
 Error_NTD="Nothing to do"
-PathRadioStations="/home/raspberry/UsefulFiles/RadioStations.m3u"
 
-MOCP="0"
+MP="0"
 PULSEAUDIO="0"
 BUZZ="0"
 STREAM="0"
 
-if ps -u raspberry -o pid,comm | grep -e mocp > /dev/null; then           MOCP="1";       fi;
-if ps -u raspberry -o pid,comm | grep -e pulseaudio > /dev/null; then     PULSEAUDIO="1"; fi;
-if ps -u raspberry -o pid,comm | grep -e Buzz > /dev/null; then           BUZZ="1";       fi;
-if ps -u raspberry -o pid,comm | grep -e mjpg_streamer > /dev/null; then  STREAM="1";     fi;
+if ps -u raspberry -o pid,comm | grep -e cmus > /dev/null; then          MP="1";         fi;
+if ps -u raspberry -o pid,comm | grep -e pulseaudio > /dev/null; then    PULSEAUDIO="1"; fi;
+if ps -u raspberry -o pid,comm | grep -e Buzz > /dev/null; then          BUZZ="1";       fi;
+if ps -u raspberry -o pid,comm | grep -e mjpg_streamer > /dev/null; then STREAM="1";     fi;
 
-CheckStateMOCP () {
-  eval  "$1=$(mocp -Q %state 2> /dev/null)"
+CheckState () {
+  eval  "$1=$(cmus-remote -Q | grep status | cut -d ' ' -f 2)"
 }
 
 FindNameRadioStation() {
-  local Link=$(mocp -Q %file 2> /dev/null);
-  if [[ $Link ]] ; then
-    local IndexOfLink=$(grep -n "$Link" "$PathRadioStations" | cut -d':' -f1);
-    local IndexOfName=$(( IndexOfLink - 1 ));
-    eval  "$1='$(sed "${IndexOfName}q;d" "$PathRadioStations" | cut -d',' -f2)'";
-  fi;
+ eval  "$1='$(cmus-remote -Q | grep title | cut -d ' ' -f 3-)'"
 }
 
 FindIPAddress(){
@@ -35,7 +29,7 @@ FindIPAddress(){
 
 if [[ $nbr_arg -eq 1 ]]; then
     if [[ $first_arg = "-status" ]]; then
-        echo "$MOCP$PULSEAUDIO$BUZZ$STREAM$EOF"
+        echo "$MP$PULSEAUDIO$BUZZ$STREAM$EOF"
     else
         echo "$Error_CNF"
     fi
@@ -48,49 +42,58 @@ elif [[ $nbr_arg -eq 2 ]]; then
         else
             echo "$Error_CNF";
         fi
-    elif [[ $first_arg = "-mocp" ]]; then
-        if [[ $MOCP = "1" ]]; then
+    elif [[ $first_arg = "-mp" ]]; then
+        if [[ $MP = "1" ]]; then
             if [[ $second_arg = "off" ]]; then
-                mocp -x 2> /dev/null;
+                killall cmus > /dev/null;
             elif [[ $second_arg = "on" ]]; then
                 echo "$Error_NTD";
+            elif [[ $second_arg = "+" ]]; then
+                cmus-remote -v +5;
+            elif [[ $second_arg = "-" ]]; then
+                cmus-remote -v -5;
             elif [[ $second_arg = "next" ]]; then
-                mocp -f 2> /dev/null;
+                CheckState mp_state;
+                if [[ $mp_state = "playing" ]]; then
+                    cmus-remote -s;
+                    cmus-remote -n;
+                    cmus-remote -p;
+                elif [[ $mp_state = "stopped" ]]; then
+                    cmus-remote -n;
+                fi;
                 FindNameRadioStation NameRadioStation;
                 if [[ $NameRadioStation ]]; then
-                    CheckStateMOCP mocp_state;
-                    if [[ $mocp_state = "PLAY" ]]; then
-                      mocp -P 2> /dev/null;
-                      echo $NameRadioStation | festival --tts;
-                      mocp -U 2> /dev/null;
-                    fi;
+                    echo $NameRadioStation | festival --tts;
                 fi;
             elif [[ $second_arg = "prev" ]]; then
-                mocp -r 2> /dev/null;
+                CheckState mp_state;
+                if [[ $mp_state = "playing" ]]; then
+                    cmus-remote -s;
+                    cmus-remote -r;
+                    cmus-remote -p;
+                elif [[ $mp_state = "stopped" ]]; then
+                    cmus-remote -r;
+                fi;
                 FindNameRadioStation NameRadioStation;
                 if [[ $NameRadioStation ]]; then
-                    CheckStateMOCP mocp_state;
-                    if [[ $mocp_state = "PLAY" ]]; then
-                      mocp -P 2> /dev/null;
-                      echo $NameRadioStation | festival --tts;
-                      mocp -U 2> /dev/null;
-                    fi;
+                    echo $NameRadioStation | festival --tts;
                 fi;
             elif [[ $second_arg = "play_pause" ]]; then
-                CheckStateMOCP mocp_state;
-                if [[ $mocp_state = "PAUSE" ]]; then
+                cmus-remote -u;
+                CheckState mp_state;
+                if [[ $mp_state = "playing" ]]; then
                     FindNameRadioStation NameRadioStation;
                     if [[ $NameRadioStation ]]; then
                       echo $NameRadioStation | festival --tts;
                     fi;
                 fi
-                mocp -G 2> /dev/null;
             else
                 echo "$Error_CNF";
             fi
-        elif [[ $MOCP = "0" ]]; then
+        elif [[ $MP = "0" ]]; then
             if [[ $second_arg = "on" || $second_arg = "play_pause" ]]; then
-                mocp -S >/dev/null 2>/dev/null && mocp -p 2> /dev/null;
+                cmusd & sleep 1 & cmus-remote -p && tmux detach-client -s cmusq;
+                # mocp -S >/dev/null 2>/dev/null && mocp -p 2> /dev/null;
             elif [[ $second_arg = "off" ]]; then
                 echo "$Error_NTD";
             else
@@ -132,9 +135,15 @@ elif [[ $nbr_arg -eq 2 ]]; then
     elif [[ $first_arg = "-talk" ]]; then
         if   [[ $second_arg = "ip" ]]; then
             FindIPAddress IPaddr;
+            Vol=$(amixer -c 0 get PCM | awk '$0~/%/{print $4}' | tr -d '[]');
+            amixer -c 0 set PCM 100%;
             echo "my i p address, is,  $IPaddr"| festival --tts;
+            amixer -c 0 set PCM $Vol;
         elif [[ $second_arg = "time" ]]; then
+            Vol=$(amixer -c 0 get PCM | awk '$0~/%/{print $4}' | tr -d '[]');
+            amixer -c 0 set PCM 100%;
             echo "now is `date "+%I:%M"`"| festival --tts;
+            amixer -c 0 set PCM $Vol;
         else
             echo "$Error_CNF";
         fi
